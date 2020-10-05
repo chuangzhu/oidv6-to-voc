@@ -1,3 +1,1 @@
-opencv-python
-pathlib
-argparse
+Pillow==6.2.1

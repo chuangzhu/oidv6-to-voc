@@ -7,44 +7,20 @@ Please see Read me file to know how to use this file.
 
 from xml.etree.ElementTree import Element, SubElement, Comment
 import xml.etree.cElementTree as ET
-from typing import NamedTuple, Iterable, List
-from PIL import Image
-import os
+from typing import NamedTuple, Iterable, List, Dict
+from functools import partial
 from pathlib import Path
 import argparse
 import csv
+import os
 
-parser = argparse.ArgumentParser(
-    description='Convert OIDv6 dataset to VOC XML format')
-parser.add_argument('annotation',
-                    type=str,
-                    required=True,
-                    nargs='*',
-                    help='Annotation file(s), e.g. train-annotations-bbox.csv')
-parser.add_argument(
-    '--desc',
-    type=str,
-    required=True,
-    help='Class description file, e.g. class-descriptions-boxable.csv')
-parser.add_argument('--imgd',
-                    type=str,
-                    required=True,
-                    help='Directory of dataset images')
-parser.add_argument('--outd',
-                    type=str,
-                    default='converted.d',
-                    help='Output directory')
-args = parser.parse_args()
+from PIL import Image
 
 
 def parse_csv(csvfile):
     with open(csvfile) as f:
         csvr = csv.reader(f)
-    return list(csvr)
-
-
-desc = dict(parse_csv(args.desc))
-outd = Path(args.outd)
+        return list(csvr)
 
 
 class AnnotationRow(NamedTuple):
@@ -63,27 +39,39 @@ class AnnotationRow(NamedTuple):
     isinside: str
 
 
-def convert_annfile(annfile):
+def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
     annl = parse_csv(annfile)[1:]
     imageids = [ann[0] for ann in annl]
     imageids = list(set(imageids))
-    grouped_anns = map(map_anns_of_image, imageids)
-    m = map(get_xml, grouped_anns)
+
+    mapper = partial(map_anns_of_image, ann_list=annl)
+    grouped_anns = map(mapper, imageids)
+
+    desc_dict = dict(parse_csv(desc))
+    xml_mapper = partial(get_xml,
+                         desc_dict=desc_dict,
+                         imgp=Path(imgd),
+                         outp=Path(outd))
+    m = map(xml_mapper, grouped_anns)
     list(m)  # run get_xml
 
 
 def map_anns_of_image(imageid: str, ann_list: List[AnnotationRow]):
     filt = lambda row: filter_ann_row(row, imageid)
-    return filter(filt, ann_list)
+    filted = filter(filt, ann_list)
+    return list(filted)
 
 
 def filter_ann_row(ann_row, imageid):
     return ann_row[0] == imageid
 
 
-def get_xml(anns_of_image: List[AnnotationRow]):
+def get_xml(anns_of_image: List[AnnotationRow], desc_dict: Dict[str, str],
+            imgp: Path, outp: Path):
     imageid = anns_of_image[0][0]
-    filename = imageid + '.jpg'
+    filename = imgp / (imageid + '.jpg')
+    if not filename.exists():
+        return
     im = Image.open(filename)
     width, height = im.size
 
@@ -92,7 +80,7 @@ def get_xml(anns_of_image: List[AnnotationRow]):
     child.text = 'open_images_volume'
 
     child_filename = SubElement(top, 'filename')
-    child_filename.text = filename
+    child_filename.text = str(filename)
 
     child_source = SubElement(top, 'source')
     child_database = SubElement(child_source, 'database')
@@ -115,7 +103,7 @@ def get_xml(anns_of_image: List[AnnotationRow]):
         child_obj = SubElement(top, 'object')
 
         child_name = SubElement(child_obj, 'name')
-        child_name.text = desc[ann_row[2]]  # labelname
+        child_name.text = desc_dict[ann_row[2]]  # labelname
         child_pose = SubElement(child_obj, 'pose')
         child_pose.text = 'Unspecified'
         child_trun = SubElement(child_obj, 'truncated')
@@ -126,18 +114,51 @@ def get_xml(anns_of_image: List[AnnotationRow]):
         child_bndbox = SubElement(child_obj, 'bndbox')
 
         child_xmin = SubElement(child_bndbox, 'xmin')
-        child_xmin.text = str(int(ann_row[4] * width))  # xmin
+        child_xmin.text = str(int(float(ann_row[4]) * width))  # xmin
         child_ymin = SubElement(child_bndbox, 'ymin')
-        child_ymin.text = str(int(ann_row[6] * height))  # ymin
+        child_ymin.text = str(int(float(ann_row[6]) * height))  # ymin
         child_xmax = SubElement(child_bndbox, 'xmax')
-        child_xmax.text = str(int(ann_row[5] * width))  # xmax
+        child_xmax.text = str(int(float(ann_row[5]) * width))  # xmax
         child_ymax = SubElement(child_bndbox, 'ymax')
-        child_ymax.text = str(int(ann_row[7] * height))  # ymax
+        child_ymax.text = str(int(float(ann_row[7]) * height))  # ymax
 
     # Iterate for each object in a image.
     m = map(get_xml_object, anns_of_image)
     list(m)
 
     tree = ET.ElementTree(top)
-    save = outd / (imageid + '.xml')
+    save = outp / (imageid + '.xml')
     tree.write(save)
+
+
+def convert(annotation_files: Iterable[str],
+            desc: str,
+            imgd: str,
+            outd: str = 'converted.d'):
+    for f in annotation_files:
+        convert_annfile(f, desc, imgd, outd)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Convert OIDv6 dataset to VOC XML format')
+    parser.add_argument(
+        'annotation',
+        type=str,
+        nargs='*',
+        help='Annotation file(s), e.g. train-annotations-bbox.csv')
+    parser.add_argument(
+        '--desc',
+        type=str,
+        required=True,
+        help='Class description file, e.g. class-descriptions-boxable.csv')
+    parser.add_argument('--imgd',
+                        type=str,
+                        required=True,
+                        help='Directory of dataset images')
+    parser.add_argument('--outd',
+                        type=str,
+                        default='converted.d',
+                        help='Output directory')
+    args = parser.parse_args()
+    convert(args.annotation, args.desc, args.imgd, args.outd)
