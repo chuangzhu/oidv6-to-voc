@@ -36,27 +36,35 @@ class AnnotationRow(NamedTuple):
 def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
     annl = parse_csv(annfile)[1:]
     imageids = [ann[0] for ann in annl]
-    imageids = list(set(imageids))
+    imageids = set(imageids)
+    imgp = Path(imgd)
+
+    # Process only existing images
+    exists = [
+        f.rstrip('.jpg') for f in os.listdir(imgp) if os.path.isfile(imgp / f)
+    ]
+    imageids = filter(lambda id_: id_ in exists, imageids)
 
     mapper = partial(map_anns_of_image, ann_list=annl)
-    grouped_anns = map(mapper, imageids)
+    grouped_anns: Iterable[List[AnnotationRow]] = map(mapper, imageids)
 
     desc_dict = dict(parse_csv(desc))
     xml_mapper = partial(get_xml,
                          desc_dict=desc_dict,
-                         imgp=Path(imgd),
+                         imgp=imgp,
                          outp=Path(outd))
     m = map(xml_mapper, grouped_anns)
     list(m)  # run get_xml
 
 
-def map_anns_of_image(imageid: str, ann_list: List[AnnotationRow]):
+def map_anns_of_image(imageid: str,
+                      ann_list: List[AnnotationRow]) -> List[AnnotationRow]:
     filt = lambda row: filter_ann_row(row, imageid)
     filted = filter(filt, ann_list)
     return list(filted)
 
 
-def filter_ann_row(ann_row, imageid):
+def filter_ann_row(ann_row, imageid) -> bool:
     return ann_row[0] == imageid
 
 
@@ -64,8 +72,6 @@ def get_xml(anns_of_image: List[AnnotationRow], desc_dict: Dict[str, str],
             imgp: Path, outp: Path):
     imageid = anns_of_image[0][0]
     filename = imgp / (imageid + '.jpg')
-    if not filename.exists():
-        return
     im = Image.open(filename)
     width, height = im.size
 
