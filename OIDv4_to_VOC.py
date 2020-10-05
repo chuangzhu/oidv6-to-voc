@@ -7,91 +7,137 @@ Please see Read me file to know how to use this file.
 
 from xml.etree.ElementTree import Element, SubElement, Comment
 import xml.etree.cElementTree as ET
-#from ElementTree_pretty import prettify
-import cv2
+from typing import NamedTuple, Iterable, List
+from PIL import Image
 import os
 from pathlib import Path
-from shutil import move
 import argparse
+import csv
 
-parser = argparse.ArgumentParser(description = 'Convert OIDV4 dataset to VOC XML format')
-parser.add_argument('--sourcepath',type = str, default = 'dataset/', help ='Path of class to convert')
-parser.add_argument('--dest_path',type=str, required=True, default='Annotation/',help='Path of Dest XML files')
+parser = argparse.ArgumentParser(
+    description='Convert OIDv6 dataset to VOC XML format')
+parser.add_argument('annotation',
+                    type=str,
+                    required=True,
+                    nargs='*',
+                    help='Annotation file(s), e.g. train-annotations-bbox.csv')
+parser.add_argument(
+    '--desc',
+    type=str,
+    required=True,
+    help='Class description file, e.g. class-descriptions-boxable.csv')
+parser.add_argument('--imgd',
+                    type=str,
+                    required=True,
+                    help='Directory of dataset images')
+parser.add_argument('--outd',
+                    type=str,
+                    default='converted.d',
+                    help='Output directory')
 args = parser.parse_args()
 
-ids = []
-for file in os.listdir(args.sourcepath): #Save all images in a list
-    filename = os.fsdecode(file)
-    if filename.endswith('.jpg'):
-        ids.append(filename[:-4])
 
-for fname in ids: 
-    myfile = os.path.join(args.dest_path,fname +'.xml')
-    myfile = Path(myfile)
-    if not myfile.exists(): #if file is not existing 
-        txtfile = os.path.join(args.sourcepath, 'Label', fname + '.txt') #Read annotation of each image from txt file
-        f = open(txtfile,"r")
-        imgfile = os.path.join(args.sourcepath, fname +'.jpg')
-        img = cv2.imread(imgfile, cv2.IMREAD_UNCHANGED) #Read image to get image width and height
-        top = Element('annotation')
-        child = SubElement(top,'folder')
-        child.text = 'open_images_volume'
+def parse_csv(csvfile):
+    with open(csvfile) as f:
+        csvr = csv.reader(f)
+    return list(csvr)
 
-        child_filename = SubElement(top,'filename')
-        child_filename.text = fname +'.jpg'
 
-        child_path = SubElement(top,'path')
-        child_path.text = '/mnt/open_images_volume/' + fname +'.jpg'
+desc = dict(parse_csv(args.desc))
+outd = Path(args.outd)
 
-        child_source = SubElement(top,'source')
-        child_database = SubElement(child_source, 'database')
-        child_database.text = 'Unknown'
 
-        child_size = SubElement(top,'size')
-        child_width = SubElement(child_size,'width')
-        child_width.text = str(img.shape[1])
+class AnnotationRow(NamedTuple):
+    imageid: str
+    source: str
+    labelname: str
+    confidence: str
+    xmin: str
+    xmax: str
+    ymin: str
+    ymax: str
+    isoccluded: str
+    istruncated: str
+    isgroupof: str
+    isdepiction: str
+    isinside: str
 
-        child_height = SubElement(child_size,'height')
-        child_height.text = str(img.shape[0])
 
-        child_depth = SubElement(child_size,'depth')
-        if len(img.shape) == 3: 
-            child_depth.text = str(img.shape[2])
-        else:
-            child_depth.text = '3'
-        child_seg = SubElement(top, 'segmented')
-        child_seg.text = '0'
-        for x in f:     #Iterate for each object in a image. 
-            x = list(x.split())
-            child_obj = SubElement(top, 'object')
+def convert_annfile(annfile):
+    annl = parse_csv(annfile)[1:]
+    imageids = [ann[0] for ann in annl]
+    imageids = list(set(imageids))
+    grouped_anns = map(map_anns_of_image, imageids)
+    m = map(get_xml, grouped_anns)
+    list(m)  # run get_xml
 
-            child_name = SubElement(child_obj, 'name')
-            child_name.text = x[0] #name
 
-            child_pose = SubElement(child_obj, 'pose')
-            child_pose.text = 'Unspecified'
+def map_anns_of_image(imageid: str, ann_list: List[AnnotationRow]):
+    filt = lambda row: filter_ann_row(row, imageid)
+    return filter(filt, ann_list)
 
-            child_trun = SubElement(child_obj, 'truncated')
-            child_trun.text = '0'
 
-            child_diff = SubElement(child_obj, 'difficult')
-            child_diff.text = '0'
+def filter_ann_row(ann_row, imageid):
+    return ann_row[0] == imageid
 
-            child_bndbox = SubElement(child_obj, 'bndbox')
 
-            child_xmin = SubElement(child_bndbox, 'xmin')
-            child_xmin.text = str(int(float(x[1]))) #xmin
+def get_xml(anns_of_image: List[AnnotationRow]):
+    imageid = anns_of_image[0][0]
+    filename = imageid + '.jpg'
+    im = Image.open(filename)
+    width, height = im.size
 
-            child_ymin = SubElement(child_bndbox, 'ymin')
-            child_ymin.text = str(int(float(x[2]))) #ymin
+    top = Element('annotation')
+    child = SubElement(top, 'folder')
+    child.text = 'open_images_volume'
 
-            child_xmax = SubElement(child_bndbox, 'xmax')
-            child_xmax.text = str(int(float(x[3]))) #xmax
+    child_filename = SubElement(top, 'filename')
+    child_filename.text = filename
 
-            child_ymax = SubElement(child_bndbox, 'ymax')
-            child_ymax.text = str(int(float(x[4]))) #ymax
+    child_source = SubElement(top, 'source')
+    child_database = SubElement(child_source, 'database')
+    child_database.text = 'Open Image Dataset v6'
+    child_image = SubElement(child_source, 'image')
+    child_image.text = anns_of_image[0][1]  # source
 
-        tree = ET.ElementTree(top)
-        save = fname+'.xml'
-        tree.write(save)
-        move(fname+'.xml', myfile)
+    child_size = SubElement(top, 'size')
+    child_width = SubElement(child_size, 'width')
+    child_width.text = str(width)
+    child_height = SubElement(child_size, 'height')
+    child_height.text = str(height)
+    child_depth = SubElement(child_size, 'depth')
+    child_depth.text = '3'
+
+    child_seg = SubElement(top, 'segmented')
+    child_seg.text = '0'
+
+    def get_xml_object(ann_row: AnnotationRow):
+        child_obj = SubElement(top, 'object')
+
+        child_name = SubElement(child_obj, 'name')
+        child_name.text = desc[ann_row[2]]  # labelname
+        child_pose = SubElement(child_obj, 'pose')
+        child_pose.text = 'Unspecified'
+        child_trun = SubElement(child_obj, 'truncated')
+        child_trun.text = ann_row[9]  # istruncated
+        child_diff = SubElement(child_obj, 'difficult')
+        child_diff.text = '0'
+
+        child_bndbox = SubElement(child_obj, 'bndbox')
+
+        child_xmin = SubElement(child_bndbox, 'xmin')
+        child_xmin.text = str(int(ann_row[4] * width))  # xmin
+        child_ymin = SubElement(child_bndbox, 'ymin')
+        child_ymin.text = str(int(ann_row[6] * height))  # ymin
+        child_xmax = SubElement(child_bndbox, 'xmax')
+        child_xmax.text = str(int(ann_row[5] * width))  # xmax
+        child_ymax = SubElement(child_bndbox, 'ymax')
+        child_ymax.text = str(int(ann_row[7] * height))  # ymax
+
+    # Iterate for each object in a image.
+    m = map(get_xml_object, anns_of_image)
+    list(m)
+
+    tree = ET.ElementTree(top)
+    save = outd / (imageid + '.xml')
+    tree.write(save)
