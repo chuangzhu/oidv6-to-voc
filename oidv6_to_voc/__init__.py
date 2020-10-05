@@ -1,16 +1,10 @@
-'''Python Code to Convert OpenImage Dataset into VOC XML format. 
-
-Author: https://github.com/AtriSaxena
-Please see Read me file to know how to use this file.
-
-'''
+'''Python Code to Convert OpenImage Dataset (v6) into VOC XML format. '''
 
 from xml.etree.ElementTree import Element, SubElement, Comment
 import xml.etree.cElementTree as ET
 from typing import NamedTuple, Iterable, List, Dict
 from functools import partial
 from pathlib import Path
-import argparse
 import csv
 import os
 
@@ -137,28 +131,3 @@ def convert(annotation_files: Iterable[str],
             outd: str = 'converted.d'):
     for f in annotation_files:
         convert_annfile(f, desc, imgd, outd)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Convert OIDv6 dataset to VOC XML format')
-    parser.add_argument(
-        'annotation',
-        type=str,
-        nargs='*',
-        help='Annotation file(s), e.g. train-annotations-bbox.csv')
-    parser.add_argument(
-        '--desc',
-        type=str,
-        required=True,
-        help='Class description file, e.g. class-descriptions-boxable.csv')
-    parser.add_argument('--imgd',
-                        type=str,
-                        required=True,
-                        help='Directory of dataset images')
-    parser.add_argument('--outd',
-                        type=str,
-                        default='converted.d',
-                        help='Output directory')
-    args = parser.parse_args()
-    convert(args.annotation, args.desc, args.imgd, args.outd)
