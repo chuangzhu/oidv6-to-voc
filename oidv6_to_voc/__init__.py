@@ -76,8 +76,8 @@ def filter_ann_row(ann_row, imageid) -> bool:
 def get_xml(anns_of_image: List[AnnotationRow], desc_dict: Dict[str, str],
             imgp: Path, outp: Path):
     imageid = anns_of_image[0][0]
-    filename = imgp / (imageid + '.jpg')
-    im = Image.open(filename)
+    filename = imageid + '.jpg'
+    im = Image.open(imgp / filename)
     width, height = im.size
 
     top = Element('annotation')
