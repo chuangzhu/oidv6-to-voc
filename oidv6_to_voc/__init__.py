@@ -34,27 +34,29 @@ class AnnotationRow(NamedTuple):
 
 
 def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
-    annl = parse_csv(annfile)[1:]
-    imageids = [ann[0] for ann in annl]
-    imageids = set(imageids)
+    imageids = set()
     imgp = Path(imgd)
-
     # Process only existing images
-    exists = [
-        f.rstrip('.jpg') for f in os.listdir(imgp) if os.path.isfile(imgp / f)
-    ]
-    imageids = filter(lambda id_: id_ in exists, imageids)
+    exists = {
+        f.rstrip('.jpg')
+        for f in os.listdir(imgp) if os.path.isfile(imgp / f)
+    }
+    annl = []
+
+    with open(annfile) as f:
+        anncsv = csv.reader(f)
+        for row in anncsv:
+            if row[0] in exists:
+                imageids.add(row[0])
+                annl.append(row)
 
     mapper = partial(map_anns_of_image, ann_list=annl)
     grouped_anns: Iterable[List[AnnotationRow]] = map(mapper, imageids)
+    grouped_anns = list(grouped_anns)
 
     desc_dict = dict(parse_csv(desc))
-    xml_mapper = partial(get_xml,
-                         desc_dict=desc_dict,
-                         imgp=imgp,
-                         outp=Path(outd))
-    m = map(xml_mapper, grouped_anns)
-    list(m)  # run get_xml
+    for anns in grouped_anns:
+        get_xml(anns, desc_dict, imgp, Path(outd))
 
 
 def map_anns_of_image(imageid: str,
