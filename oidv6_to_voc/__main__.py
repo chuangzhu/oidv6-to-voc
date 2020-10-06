@@ -1,7 +1,7 @@
 from . import convert
 import argparse
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(
         description='Convert OIDv6 dataset to VOC XML format')
     parser.add_argument(
@@ -27,3 +27,6 @@ if __name__ == '__main__':
                         help='Output directory')
     args = parser.parse_args()
     convert(args.annotation, args.desc, args.imgd, args.outd)
+
+if __name__ == '__main__':
+    main()

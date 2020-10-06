@@ -37,12 +37,14 @@ def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
     imageids = set()
     imgp = Path(imgd)
     # Process only existing images
+    print('Getting image ids...')
     exists = {
         f.rstrip('.jpg')
         for f in os.listdir(imgp) if os.path.isfile(imgp / f)
     }
     annl = []
 
+    print('Reading annotation CSV...')
     with open(annfile) as f:
         anncsv = csv.reader(f)
         for row in anncsv:
@@ -55,6 +57,7 @@ def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
     grouped_anns = list(grouped_anns)
 
     desc_dict = dict(parse_csv(desc))
+    print('Generating VOC XMLs...')
     for anns in grouped_anns:
         get_xml(anns, desc_dict, imgp, Path(outd))
 
