@@ -6,7 +6,7 @@ with open(path.join(here, 'README.md')) as f:
     long_description = f.read()
 
 setup(name='oidv6-to-voc',
-      version='0.1.2',
+      version='0.1.3',
       author='Zhu Chuang',
       author_email='genelocated@yandex.com',
       description='Convert Open Images Dataset v6 to PASCAL VOC format.',
@@ -14,7 +14,7 @@ setup(name='oidv6-to-voc',
       long_description=long_description,
       long_description_content_type='text/markdown',
       packages=find_packages(),
-      install_requires=['Pillow==6.2.1'],
+      install_requires=['Pillow>=6.2.1'],
       entry_points={
           'console_scripts': ['oidv6-to-voc = oidv6_to_voc.__main__:main']
       })
