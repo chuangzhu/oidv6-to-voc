@@ -39,8 +39,8 @@ def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
     # Process only existing images
     print('Getting image ids...')
     exists = {
-        f.rstrip('.jpg')
-        for f in os.listdir(imgp) if os.path.isfile(imgp / f)
+        p.name.rstrip('.jpg')
+        for p in imgp.rglob('*.jpg') if p.is_file()
     }
     annl = []
 
