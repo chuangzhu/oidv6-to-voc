@@ -140,5 +140,6 @@ def convert(annotation_files: Iterable[str],
             desc: str,
             imgd: str,
             outd: str = 'converted.d'):
+    Path(outd).mkdir(parents=True, exist_ok=True)
     for f in annotation_files:
         convert_annfile(f, desc, imgd, outd)
