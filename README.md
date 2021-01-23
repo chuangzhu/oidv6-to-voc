@@ -16,7 +16,7 @@ Once installed, you should be able to run it directly:
 oidv6-to-voc -h
 ```
 
-If your shell cannot found the command, try running it with:
+If your shell cannot find the command, try running it with:
 
 ```sh
 python3 -m oidv6_to_voc -h
