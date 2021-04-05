@@ -42,23 +42,22 @@ def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
         p.name.rstrip('.jpg')
         for p in imgp.rglob('*.jpg') if p.is_file()
     }
-    annl = []
 
+    annl: dict[str,  List[AnnotationRow]] = dict()
     print('Reading annotation CSV...')
     with open(annfile) as f:
         anncsv = csv.reader(f)
         for row in anncsv:
-            if row[0] in exists:
+            imageid = row[0]
+            if imageid in exists:
                 imageids.add(row[0])
-                annl.append(row)
-
-    mapper = partial(map_anns_of_image, ann_list=annl)
-    grouped_anns: Iterable[List[AnnotationRow]] = map(mapper, imageids)
-    grouped_anns = list(grouped_anns)
+                if imageid not in annl:
+                    annl[imageid] = list()
+                annl[imageid].append(row)
 
     desc_dict = dict(parse_csv(desc))
     print('Generating VOC XMLs...')
-    for anns in grouped_anns:
+    for anns in annl.values():
         get_xml(anns, desc_dict, imgp, Path(outd))
 
 
