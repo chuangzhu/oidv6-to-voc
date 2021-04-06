@@ -43,7 +43,7 @@ def convert_annfile(annfile: str, desc: str, imgd: str, outd: str):
         for p in imgp.rglob('*.jpg') if p.is_file()
     }
 
-    annl: dict[str,  List[AnnotationRow]] = dict()
+    annl: Dict[str,  List[AnnotationRow]] = dict()
     print('Reading annotation CSV...')
     with open(annfile) as f:
         anncsv = csv.reader(f)
